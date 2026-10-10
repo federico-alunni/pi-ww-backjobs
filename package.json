@@ -1,0 +1,32 @@
+{
+  "name": "ww-backgrounds",
+  "version": "0.1.0",
+  "description": "Background terminal operations manager and widget for Pi coding agent and Herdr",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "terminal",
+    "herdr",
+    "background"
+  ],
+  "license": "MIT",
+  "author": "Federico Alunni",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0"
+  }
+}
