@@ -54,7 +54,7 @@ export function registerBackgroundTools(pi: ExtensionAPI, manager: JobManager): 
                 `Successfully started background job [${job.id}] "${job.name}".\n` +
                 `Running in ${targetDesc}.\n` +
                 `Status: running (CWD: ${job.cwd}).\n` +
-                `The user can see it in the status widget and open its terminal tab anytime via /bg or Ctrl+B.`,
+                `The user can see it in the status widget and open its terminal tab anytime via /bg or Ctrl+Alt+B.`,
             },
           ],
           details: { job },

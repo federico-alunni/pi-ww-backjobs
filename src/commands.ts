@@ -7,7 +7,7 @@ export function registerBackgroundCommands(pi: ExtensionAPI, manager: JobManager
     const jobs = manager.getAllJobs();
 
     if (jobs.length === 0) {
-      ctx.ui.notify("Nessuna operazione in background attiva o recente.", "info");
+      ctx.ui.notify("No active or recent background operations.", "info");
       return;
     }
 
@@ -19,7 +19,7 @@ export function registerBackgroundCommands(pi: ExtensionAPI, manager: JobManager
     });
 
     const chosenOption = await ctx.ui.select(
-      "Seleziona operazione in background:",
+      "Select background operation:",
       jobOptions,
     );
 
@@ -34,14 +34,14 @@ export function registerBackgroundCommands(pi: ExtensionAPI, manager: JobManager
 
     // Show actions for this job
     const actionOptions = [
-      "🚀 Apri terminale in una tab a parte (Focus)",
-      "📄 Leggi output recente (Scrollback)",
-      "🛑 Invia segnale di interruzione (Ctrl+C)",
-      "❌ Chiudi terminale / tab definitivamente",
+      "🚀 Open terminal in dedicated tab (Focus)",
+      "📄 View recent terminal output (Scrollback)",
+      "🛑 Send interrupt signal (Ctrl+C)",
+      "❌ Close terminal and tab permanently",
     ];
 
     const action = await ctx.ui.select(
-      `Operazione [${job.id}] "${job.name}" - Scegli azione:`,
+      `Job [${job.id}] "${job.name}" - Choose action:`,
       actionOptions,
     );
 
@@ -50,38 +50,38 @@ export function registerBackgroundCommands(pi: ExtensionAPI, manager: JobManager
     if (action.startsWith("🚀")) {
       try {
         await manager.focusJobTab(job.id);
-        ctx.ui.notify(`Terminale aperto e selezionato in Herdr: "${job.name}"`, "info");
+        ctx.ui.notify(`Terminal opened and focused in Herdr: "${job.name}"`, "info");
       } catch (err: any) {
-        ctx.ui.notify(`Errore nell'apertura della tab: ${err.message}`, "error");
+        ctx.ui.notify(`Failed to focus tab: ${err.message}`, "error");
       }
     } else if (action.startsWith("📄")) {
       try {
         const output = await manager.readOutput(job.id, 100);
         await ctx.ui.editor(
-          `Log terminale [${job.id}] - ${job.name} (premi Esc o Salva per uscire)`,
-          output || "(Nessun output registrato finora)",
+          `Terminal log [${job.id}] - ${job.name} (Press Esc to close)`,
+          output || "(No output recorded yet)",
         );
       } catch (err: any) {
-        ctx.ui.notify(`Errore durante la lettura dell'output: ${err.message}`, "error");
+        ctx.ui.notify(`Failed to read output: ${err.message}`, "error");
       }
     } else if (action.startsWith("🛑")) {
       try {
         await manager.stopJob(job.id);
-        ctx.ui.notify(`Segnale di interruzione (Ctrl+C) inviato a [${job.id}]`, "warning");
+        ctx.ui.notify(`Sent interrupt signal (Ctrl+C) to [${job.id}]`, "warning");
       } catch (err: any) {
-        ctx.ui.notify(`Errore durante l'interruzione: ${err.message}`, "error");
+        ctx.ui.notify(`Failed to interrupt job: ${err.message}`, "error");
       }
     } else if (action.startsWith("❌")) {
       const confirm = await ctx.ui.confirm(
-        "Conferma chiusura",
-        `Vuoi davvero chiudere definitivamente il terminale per [${job.id}]?`,
+        "Confirm Terminal Close",
+        `Are you sure you want to permanently close the terminal for [${job.id}]?`,
       );
       if (confirm) {
         try {
           await manager.closeJobTerminal(job.id);
-          ctx.ui.notify(`Terminale [${job.id}] chiuso con successo.`, "info");
+          ctx.ui.notify(`Terminal [${job.id}] closed successfully.`, "info");
         } catch (err: any) {
-          ctx.ui.notify(`Errore durante la chiusura del terminale: ${err.message}`, "error");
+          ctx.ui.notify(`Failed to close terminal: ${err.message}`, "error");
         }
       }
     }
@@ -89,7 +89,7 @@ export function registerBackgroundCommands(pi: ExtensionAPI, manager: JobManager
 
   // ── /backgrounds command ──
   pi.registerCommand("backgrounds", {
-    description: "Visualizza e gestisci le operazioni in background e i terminali aperti",
+    description: "View and manage background operations and open terminals",
     handler: async (_args, ctx) => {
       await openInteractiveMenu(ctx);
     },
@@ -97,16 +97,16 @@ export function registerBackgroundCommands(pi: ExtensionAPI, manager: JobManager
 
   // ── /bg alias ──
   pi.registerCommand("bg", {
-    description: "Alias rapido per /backgrounds",
+    description: "Quick alias for /backgrounds",
     handler: async (_args, ctx) => {
       await openInteractiveMenu(ctx);
     },
   });
 
-  // ── Ctrl+B shortcut ──
+  // ── Ctrl+Alt+B shortcut ──
   try {
-    pi.registerShortcut("ctrl+b", {
-      description: "Gestione terminali e operazioni in background (ww-backgrounds)",
+    pi.registerShortcut("ctrl+alt+b", {
+      description: "Manage background operations and terminals (ww-backgrounds)",
       handler: async (ctx) => {
         await openInteractiveMenu(ctx);
       },

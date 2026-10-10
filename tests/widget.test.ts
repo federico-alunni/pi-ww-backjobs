@@ -45,26 +45,34 @@ test("renderWidgetLines renders running jobs", () => {
   assert.ok(lines.some((l) => l.includes("⚡ Backgrounds (1 active)")));
   assert.ok(lines.some((l) => l.includes("[bg-1]") && l.includes("npm run dev")));
   assert.ok(lines.some((l) => l.includes("tab: dev-server")));
-  assert.ok(lines.some((l) => l.includes("/bg o Ctrl+B")));
+  assert.ok(lines.some((l) => l.includes("Ctrl+Alt+B or /bg")));
 });
 
-test("renderWidgetLines excludes old completed jobs after linger period", () => {
-  const oldJob: BackgroundJob = {
-    id: "bg-old",
-    name: "old task",
-    command: "echo old",
-    cwd: "/test",
-    paneId: "w1:p1",
-    tabId: "w1:t1",
-    tabLabel: "old",
-    placement: "tab",
-    status: "completed",
-    startedAt: Date.now() - 60000,
-    endedAt: Date.now() - 40000, // 40s ago > 30s linger
-    statusFile: "/tmp/fake.status",
-    scriptFile: "/tmp/fake.sh",
-  };
+test("renderWidgetLines aligns all border lines to the exact width", async () => {
+  const { visibleWidth } = await import("@earendil-works/pi-tui");
+  const jobs: BackgroundJob[] = [
+    {
+      id: "bg-1",
+      name: "test-interrupt",
+      command: "sleep 60",
+      cwd: "/test",
+      paneId: "w6:p25",
+      tabId: "w6:t25",
+      tabLabel: "test-interrupt",
+      placement: "tab",
+      status: "running",
+      startedAt: Date.now() - 12000,
+      statusFile: "/tmp/fake.status",
+      scriptFile: "/tmp/fake.sh",
+    },
+  ];
 
-  const lines = renderWidgetLines([oldJob], mockTheme, 80);
-  assert.equal(lines, undefined);
+  const targetWidth = 80;
+  const lines = renderWidgetLines(jobs, mockTheme, targetWidth);
+  assert.ok(lines && lines.length === 4); // top, job, hint, bottom
+
+  for (const line of lines) {
+    assert.equal(visibleWidth(line), targetWidth);
+  }
 });
+

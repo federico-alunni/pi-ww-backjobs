@@ -1,57 +1,58 @@
 # ww-backgrounds
 
-Estensione per **[Pi coding agent](https://github.com/badlogic/pi-mono)** e **[Herdr](https://herdr.dev)** per visualizzare e gestire operazioni e comandi in background lanciati dagli agenti, con un mini-widget informativo sopra l'editor e la possibilità di aprire e gestire i terminali dedicati in tab separate.
+Extension for **[Pi coding agent](https://github.com/badlogic/pi-mono)** and **[Herdr](https://herdr.dev)** to view and manage background operations and terminals launched by agents, featuring a status widget above the editor and the ability to promote and manage terminals in dedicated tabs.
 
 ---
 
-## Funzionalità principali
+## Key Features
 
-1. **Esecuzione non bloccante per gli agenti (`background_run`)**:
-   - Gli agenti possono avviare processi persistenti o di lunga durata (es. dev server `npm run dev`, suite di test `cargo test --watch`, docker compose, build lunghe).
-   - L'agente non rimane bloccato ad attendere la fine del comando: il turno prosegue normalmente mentre il job gira in un terminale reale gestito da Herdr.
+1. **Non-blocking Agent Execution (`background_run`)**:
+   - Agents can launch long-running or persistent tasks (e.g., dev servers `npm run dev`, test watchers `cargo test --watch`, docker compose, build tasks).
+   - The agent does not get blocked waiting for the command: the turn completes immediately while the job runs in a real terminal managed by Herdr.
 
-2. **Mini Widget nella TUI (`setWidget`)**:
-   - Un box compatto posizionato sopra l'editor di Pi mostra in tempo reale:
-     - Stato dell'operazione (`● running`, `✓ completed`, `✖ failed`, `■ stopped`).
-     - Nome del task e ID univoco (`[bg-1]`).
-     - Posizione Herdr (es. `tab: dev-server` o `pane: w6:p3`).
-     - Tempo trascorso o durata complessiva.
-   - Si nasconde automaticamente quando non ci sono operazioni attive o recenti.
+2. **Terminal UI Widget (`setWidget`)**:
+   - A bordered status box displayed above the editor showing:
+     - Operation status (`● running`, `✓ completed`, `✖ failed`, `■ stopped`).
+     - Task name and unique identifier (`[bg-1]`).
+     - Herdr target location (e.g., `tab: dev-server` or `pane: w6:p3`).
+     - Real-time elapsed time or total duration.
+   - All border lines are aligned to the exact terminal width.
+   - Automatically hides when there are no active or recent operations.
 
-3. **Aprire e gestire i terminali in una tab (`/bg` o `Ctrl+B`)**:
-   - Menu interattivo con selezione rapida:
-     - 🚀 **Apri terminale in una tab a parte (Focus)**: porta subito il focus dell'utente sulla scheda Herdr del terminale.
-     - 📄 **Leggi output recente**: visualizza gli ultimi log senza cambiare tab.
-     - 🛑 **Interrompi operazione (Ctrl+C)**: arresta il processo in esecuzione.
-     - ❌ **Chiudi terminale/tab**: chiude definitivamente la scheda di Herdr.
+3. **Open and Manage Terminals (`/bg` or `Ctrl+Alt+B`)**:
+   - Interactive selection menu:
+     - 🚀 **Open terminal in dedicated tab (Focus)**: brings immediate user focus to the Herdr terminal tab.
+     - 📄 **View recent terminal output**: inspect scrollback logs without switching tabs.
+     - 🛑 **Send interrupt signal (Ctrl+C)**: terminates the running process.
+     - ❌ **Close terminal and tab permanently**: closes the Herdr pane/tab.
 
 ---
 
-## Tool per gli Agenti
+## Agent Tools
 
-| Tool | Descrizione |
+| Tool | Description |
 | --- | --- |
-| `background_run` | Avvia un comando shell in un terminale Herdr in background (`tab` o `split`). |
-| `background_list` | Elenca tutte le operazioni attive e recenti con stato, durata e ID terminale. |
-| `background_read` | Legge le ultime righe di output dal terminale dell'operazione. |
-| `background_stop` | Invia un segnale di interruzione (`Ctrl+C`) al job specificato. |
+| `background_run` | Runs a shell command in a background Herdr terminal (`tab` or `split`). |
+| `background_list` | Lists all active and recent background operations with status, duration, and terminal IDs. |
+| `background_read` | Reads recent lines of output from the terminal without interrupting it. |
+| `background_stop` | Sends an interrupt signal (`Ctrl+C`) to the specified job. |
 
-### Parametri di `background_run`
-- `command` (string, obbligatorio): il comando shell da eseguire.
-- `name` (string, opzionale): etichetta o nome sintetico del task.
-- `cwd` (string, opzionale): cartella di lavoro (default: directory corrente).
-- `placement` (opzionale, `"tab"` \| `"split"`, default `"tab"`): dove eseguire il processo.
-
----
-
-## Comandi e Scorciatoie per l'Utente
-
-- `/backgrounds` (oppure `/bg`): apre il menu di selezione e gestione dei terminali in background.
-- `Ctrl+B`: scorciatoia rapida da tastiera per aprire lo stesso menu interattivo.
+### Parameters for `background_run`
+- `command` (string, required): the shell command to execute.
+- `name` (string, optional): short label or descriptive name for the task.
+- `cwd` (string, optional): working directory (defaults to current directory).
+- `placement` (optional, `"tab"` \| `"split"`, default `"tab"`): where to run the process.
 
 ---
 
-## Installazione
+## User Commands & Shortcuts
+
+- `/backgrounds` (or `/bg`): opens the interactive management menu.
+- `Ctrl+Alt+B`: keyboard shortcut to open the management menu.
+
+---
+
+## Installation
 
 In Pi:
 
@@ -59,7 +60,7 @@ In Pi:
 pi install /Users/federico.alunni/code/personal/ww-backgrounds
 ```
 
-Oppure aggiungendolo a `~/.pi/agent/settings.json`:
+Or by adding it to `~/.pi/agent/settings.json`:
 
 ```json
 {
@@ -71,6 +72,6 @@ Oppure aggiungendolo a `~/.pi/agent/settings.json`:
 
 ---
 
-## Licenza
+## License
 
 MIT
