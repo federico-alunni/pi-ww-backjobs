@@ -7,6 +7,23 @@ import { renderWidgetLines } from "./widget.ts";
 export default function backgroundsExtension(pi: ExtensionAPI): void {
   const manager = new JobManager();
   let latestCtx: ExtensionContext | undefined;
+  let widgetTickTimer: NodeJS.Timeout | undefined;
+
+  function ensureWidgetTick(active: boolean): void {
+    if (active) {
+      if (!widgetTickTimer) {
+        widgetTickTimer = setInterval(() => {
+          updateWidget();
+        }, 1000);
+        widgetTickTimer.unref?.();
+      }
+    } else {
+      if (widgetTickTimer) {
+        clearInterval(widgetTickTimer);
+        widgetTickTimer = undefined;
+      }
+    }
+  }
 
   function updateWidget(): void {
     if (!latestCtx || !latestCtx.hasUI) return;
@@ -15,6 +32,8 @@ export default function backgroundsExtension(pi: ExtensionAPI): void {
     const hasVisible = jobs.some(
       (j) => j.status === "running" || (j.endedAt && Date.now() - j.endedAt < 30_000),
     );
+
+    ensureWidgetTick(hasVisible);
 
     if (!hasVisible) {
       try {
@@ -55,6 +74,7 @@ export default function backgroundsExtension(pi: ExtensionAPI): void {
 
   // Clean up on session shutdown
   pi.on("session_shutdown", () => {
+    ensureWidgetTick(false);
     if (latestCtx) {
       try {
         latestCtx.ui.setWidget("ww-backgrounds", undefined);

@@ -56,7 +56,7 @@ export class JobManager {
     return this.jobs.get(id);
   }
 
-  startPolling(intervalMs = 2000): void {
+  startPolling(intervalMs = 1000): void {
     if (this.pollInterval) return;
     this.pollInterval = setInterval(() => {
       void this.checkJobsStatus();
@@ -83,7 +83,7 @@ export class JobManager {
           const raw = readFileSync(job.statusFile, "utf8").trim();
           if (raw) {
             const data = JSON.parse(raw);
-            if (data.status === "completed" || data.status === "failed") {
+            if (data.status === "completed" || data.status === "failed" || data.status === "stopped") {
               job.status = data.status;
               job.exitCode = typeof data.exitCode === "number" ? data.exitCode : null;
               job.endedAt = data.endedAt ?? Date.now();
@@ -114,29 +114,41 @@ export class JobManager {
         const shellPid = proc.shell_pid;
         const nonShellProcs = fgProcs.filter((p) => p.pid !== shellPid);
 
-        // If command was launched > 3s ago and there are no active non-shell processes
-        if (Date.now() - job.startedAt > 3000 && nonShellProcs.length === 0) {
-          // It finished, re-read status file one last time
+        // If command was launched > 2s ago and there are no active non-shell processes
+        if (Date.now() - job.startedAt > 2000 && nonShellProcs.length === 0) {
+          // The shell returned to prompt: the command is no longer running!
+          let finalStatus: JobStatus = "completed";
+          let finalExitCode: number | null = 0;
+
           if (existsSync(job.statusFile)) {
             try {
               const raw = readFileSync(job.statusFile, "utf8").trim();
               if (raw) {
                 const data = JSON.parse(raw);
-                job.status = data.status ?? "completed";
-                job.exitCode = data.exitCode ?? 0;
-                job.endedAt = data.endedAt ?? Date.now();
+                if (data.status === "completed" || data.status === "failed" || data.status === "stopped") {
+                  finalStatus = data.status;
+                  finalExitCode = data.exitCode ?? (data.status === "failed" ? 1 : 0);
+                } else {
+                  // File still says "running", but processes are gone: it was interrupted (Ctrl+C / SIGINT)
+                  finalStatus = "stopped";
+                  finalExitCode = 130;
+                }
               } else {
-                job.status = "completed";
-                job.endedAt = Date.now();
+                finalStatus = "stopped";
+                finalExitCode = 130;
               }
             } catch {
-              job.status = "completed";
-              job.endedAt = Date.now();
+              finalStatus = "stopped";
+              finalExitCode = 130;
             }
           } else {
-            job.status = "completed";
-            job.endedAt = Date.now();
+            finalStatus = "completed";
+            finalExitCode = 0;
           }
+
+          job.status = finalStatus;
+          job.exitCode = finalExitCode;
+          job.endedAt = Date.now();
           changed = true;
         }
       }
@@ -163,10 +175,32 @@ export class JobManager {
     const statusFile = join(tmpdir(), `ww_${id}_${timestamp}.status.json`);
     const scriptFile = join(tmpdir(), `ww_${id}_${timestamp}.sh`);
 
-    // Prepare runner shell script
+    // Prepare runner shell script with signal trapping
     const scriptContent = `#!/bin/bash
 STATUS_FILE=${JSON.stringify(statusFile)}
 printf '{"status":"running","startedAt":%s}\\n' "$(date +%s)000" > "$STATUS_FILE"
+
+_INTERRUPTED=0
+trap '_INTERRUPTED=1; exit 130' INT
+trap '_INTERRUPTED=1; exit 143' TERM
+
+_cleanup() {
+  _CODE=$?
+  if [ -f "$STATUS_FILE.done" ]; then
+    return
+  fi
+  touch "$STATUS_FILE.done"
+
+  if [ $_INTERRUPTED -eq 1 ] || [ $_CODE -eq 130 ] || [ $_CODE -eq 143 ]; then
+    _STATUS="stopped"
+  elif [ $_CODE -eq 0 ]; then
+    _STATUS="completed"
+  else
+    _STATUS="failed"
+  fi
+  printf '{"status":"%s","exitCode":%d,"endedAt":%s}\\n' "$_STATUS" "$_CODE" "$(date +%s)000" > "$STATUS_FILE"
+}
+trap _cleanup EXIT
 
 echo "========================================================"
 echo "⚡ ww-backgrounds [${id}]: ${name}"
@@ -178,20 +212,18 @@ echo ""
 (
   cd ${JSON.stringify(cwd)} && ${options.command}
 )
-__EXIT_CODE=$?
+__CMD_EXIT=$?
 
 echo ""
 echo "--------------------------------------------------------"
-if [ $__EXIT_CODE -eq 0 ]; then
+if [ $__CMD_EXIT -eq 0 ]; then
   echo "✓ [${id}] Completed successfully (exit 0)"
-  STATUS="completed"
 else
-  echo "✖ [${id}] Failed with exit code $__EXIT_CODE"
-  STATUS="failed"
+  echo "✖ [${id}] Exited with code $__CMD_EXIT"
 fi
 echo "--------------------------------------------------------"
 
-printf '{"status":"%s","exitCode":%d,"endedAt":%s}\\n' "$STATUS" "$__EXIT_CODE" "$(date +%s)000" > "$STATUS_FILE"
+exit $__CMD_EXIT
 `;
 
     writeFileSync(scriptFile, scriptContent, { mode: 0o755 });
