@@ -116,11 +116,17 @@ Pattern matching starts at `cursor` (default 0), so output printed before
 ### Tools
 | Tool | Purpose |
 |---|---|
-| `background_run`  | start a job; parameter `onExit` (see below) |
+| `background_run`  | start a job: `command`, `name?`, `cwd?`, `onExit?` |
 | `background_list` | list jobs |
-| `background_read` | new output since the agent's last read (or `tail`) |
-| `background_wait` | wait for exit / pattern / timeout |
-| `background_stop` | stop a job |
+| `background_read` | `id`, `tail?`: new output since the agent's last read, or last N lines |
+| `background_wait` | `id`, `pattern?` (regex), `timeoutSeconds?` (default 60, max 1800) |
+| `background_stop` | `id` |
+
+The adapter keeps one read cursor per job for the agent: `background_read`
+and `background_wait` return and match only output the agent has not seen.
+
+The process manager is created lazily (first tool call or API call) and
+disposed on `session_shutdown`.
 
 ### Exit notification (`onExit`)
 Chosen per job by whoever starts it. Default: `wake`.
@@ -134,8 +140,16 @@ Chosen per job by whoever starts it. Default: `wake`.
 The message contains id, name, status, exit code, duration and the last
 lines of output.
 
+- No message when the agent already learned the outcome from a tool result
+  (`background_wait` returning `exit`, `background_stop`, `background_read`
+  of a finished job). The check runs on the next macrotask, after those
+  tool calls marked the job.
+- A job stopped by the user from `/bg` downgrades `wake` to `inform`.
+- No messages during `session_shutdown`.
+
 ### User visibility
 - Widget above the editor: running jobs plus recently finished ones.
+- Footer status: number of active jobs.
 - `/bg` and `Ctrl+Alt+B`: list, read output, stop, remove.
 
 ### Integration with other extensions (`pi.events`)

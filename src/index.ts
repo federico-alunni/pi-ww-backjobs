@@ -1,92 +1,70 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { registerBackgroundCommands } from "./commands.ts";
-import { JobManager } from "./job-manager.ts";
-import { registerBackgroundTools } from "./tools.ts";
-import { renderWidgetLines } from "./widget.ts";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { LocalBackend } from "./backends/local.ts";
+import { ProcessManager } from "./core/process-manager.ts";
+import { API_CHANNEL, REQUEST_API_CHANNEL, createApi, forwardEvents } from "./pi/bridge.ts";
+import { registerCommands } from "./pi/commands.ts";
+import { registerMessageRenderer } from "./pi/message-renderer.ts";
+import { ExitNotifier } from "./pi/notifier.ts";
+import { registerTools, type AdapterState } from "./pi/tools.ts";
+import { WidgetController } from "./pi/widget.ts";
+
+export type { BackgroundsApi } from "./pi/bridge.ts";
+export { API_CHANNEL, EVENT_CHANNEL, REQUEST_API_CHANNEL } from "./pi/bridge.ts";
 
 export default function backgroundsExtension(pi: ExtensionAPI): void {
-  const manager = new JobManager();
-  let latestCtx: ExtensionContext | undefined;
-  let widgetTickTimer: NodeJS.Timeout | undefined;
+  let current: ProcessManager | undefined;
+  let unwire: (() => void) | undefined;
 
-  function ensureWidgetTick(active: boolean): void {
-    if (active) {
-      if (!widgetTickTimer) {
-        widgetTickTimer = setInterval(() => {
-          updateWidget();
-        }, 1000);
-        widgetTickTimer.unref?.();
-      }
-    } else {
-      if (widgetTickTimer) {
-        clearInterval(widgetTickTimer);
-        widgetTickTimer = undefined;
-      }
-    }
-  }
-
-  function updateWidget(): void {
-    if (!latestCtx || !latestCtx.hasUI) return;
-
-    const jobs = manager.getAllJobs();
-    const hasVisible = jobs.some(
-      (j) => j.status === "running" || (j.endedAt && Date.now() - j.endedAt < 30_000),
-    );
-
-    ensureWidgetTick(hasVisible);
-
-    if (!hasVisible) {
-      try {
-        latestCtx.ui.setWidget("ww-backgrounds", undefined);
-      } catch {}
-      return;
-    }
-
-    try {
-      latestCtx.ui.setWidget(
-        "ww-backgrounds",
-        (_tui: any, theme: any) => ({
-          invalidate() {},
-          render(width: number) {
-            return renderWidgetLines(manager.getAllJobs(), theme, width) ?? [];
-          },
-        }),
-        { placement: "aboveEditor" },
-      );
-    } catch {}
-  }
-
-  // Subscribe to job manager updates
-  manager.onUpdate(() => {
-    updateWidget();
+  const notifier = new ExitNotifier({
+    send: (message, options) => pi.sendMessage(message, options),
+    readTail: async (id, lines, maxBytes) => (await manager().read(id, { tail: lines, maxBytes })).text,
   });
+  const widget = new WidgetController(() => current?.list() ?? []);
 
-  // Track active ExtensionContext
+  /** The manager is created lazily: no processes, timers or files at load time. */
+  function manager(): ProcessManager {
+    if (current) return current;
+    const created = new ProcessManager({ backends: [new LocalBackend()] });
+    const offs = [
+      forwardEvents(created, pi.events),
+      created.on("start", () => widget.refresh()),
+      created.on("status", () => widget.refresh()),
+      created.on("exit", (event) => {
+        widget.refresh();
+        void notifier.handleExit(event.job);
+      }),
+    ];
+    unwire = () => offs.forEach((off) => off());
+    current = created;
+    return created;
+  }
+
+  const state: AdapterState = { manager, notifier, cursors: new Map() };
+  const api = createApi(manager);
+  const publishApi = () => pi.events.emit(API_CHANNEL, api);
+
+  registerTools(pi, state);
+  registerCommands(pi, state);
+  registerMessageRenderer(pi);
+  pi.events.on(REQUEST_API_CHANNEL, publishApi);
+  publishApi();
+
   pi.on("session_start", (_event, ctx) => {
-    latestCtx = ctx;
-    updateWidget();
+    notifier.setEnabled(true);
+    widget.attach(ctx);
+    publishApi();
   });
 
-  pi.on("turn_start", (_event, ctx) => {
-    latestCtx = ctx;
-    updateWidget();
+  pi.on("session_shutdown", async () => {
+    // Jobs are stopped on shutdown: do not notify a session that is going away.
+    notifier.setEnabled(false);
+    widget.detach();
+    const disposing = current;
+    unwire?.();
+    unwire = undefined;
+    current = undefined;
+    state.cursors.clear();
+    notifier.reset();
+    await disposing?.dispose();
   });
-
-  // Clean up on session shutdown
-  pi.on("session_shutdown", () => {
-    ensureWidgetTick(false);
-    if (latestCtx) {
-      try {
-        latestCtx.ui.setWidget("ww-backgrounds", undefined);
-      } catch {}
-    }
-    manager.dispose();
-    latestCtx = undefined;
-  });
-
-  // Register Agent Tools
-  registerBackgroundTools(pi, manager);
-
-  // Register Slash Commands and Shortcuts
-  registerBackgroundCommands(pi, manager);
 }

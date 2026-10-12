@@ -1,76 +1,76 @@
 # ww-backgrounds
 
-Extension for **[Pi coding agent](https://github.com/badlogic/pi-mono)** and **[Herdr](https://herdr.dev)** to view and manage background operations and terminals launched by agents, featuring a status widget above the editor and the ability to promote and manage terminals in dedicated tabs.
+[Pi coding agent](https://github.com/badlogic/pi-mono) extension that does one thing: **manage background processes**, for the agent and for the user.
 
----
+- The agent starts long-running commands (dev servers, watchers, long builds/tests) without blocking its turn.
+- The user always sees what is running in a widget above the editor and a footer counter.
+- When a job ends, the agent is notified (and woken up if idle), so nobody has to poll.
 
-## Key Features
+See [DESIGN.md](DESIGN.md) for the architecture and the contracts.
 
-1. **Non-blocking Agent Execution (`background_run`)**:
-   - Agents can launch long-running or persistent tasks (e.g., dev servers `npm run dev`, test watchers `cargo test --watch`, docker compose, build tasks).
-   - The agent does not get blocked waiting for the command: the turn completes immediately while the job runs in a real terminal managed by Herdr.
+## Agent tools
 
-2. **Terminal UI Widget (`setWidget`)**:
-   - A bordered status box displayed above the editor showing:
-     - Operation status (`● running`, `✓ completed`, `✖ failed`, `■ stopped`).
-     - Task name and unique identifier (`[bg-1]`).
-     - Herdr target location (e.g., `tab: dev-server` or `pane: w6:p3`).
-     - Real-time elapsed time or total duration.
-   - All border lines are aligned to the exact terminal width.
-   - Automatically hides when there are no active or recent operations.
-
-3. **Open and Manage Terminals (`/bg` or `Ctrl+Alt+B`)**:
-   - Interactive selection menu:
-     - 🚀 **Open terminal in dedicated tab (Focus)**: brings immediate user focus to the Herdr terminal tab.
-     - 📄 **View recent terminal output**: inspect scrollback logs without switching tabs.
-     - 🛑 **Send interrupt signal (Ctrl+C)**: terminates the running process.
-     - ❌ **Close terminal and tab permanently**: closes the Herdr pane/tab.
-
----
-
-## Agent Tools
-
-| Tool | Description |
+| Tool | Purpose |
 | --- | --- |
-| `background_run` | Runs a shell command in a background Herdr terminal (`tab` or `split`). |
-| `background_list` | Lists all active and recent background operations with status, duration, and terminal IDs. |
-| `background_read` | Reads recent lines of output from the terminal without interrupting it. |
-| `background_stop` | Sends an interrupt signal (`Ctrl+C`) to the specified job. |
+| `background_run` | Start a command; returns immediately. Params: `command`, `name?`, `cwd?`, `onExit?` |
+| `background_list` | Jobs with status, duration, pid, command |
+| `background_read` | Output produced since the agent's last read, or the last `tail` lines |
+| `background_wait` | Wait for exit, for a regex in the output (`pattern`), or for `timeoutSeconds` |
+| `background_stop` | SIGTERM to the whole process group, SIGKILL after a grace period |
 
-### Parameters for `background_run`
-- `command` (string, required): the shell command to execute.
-- `name` (string, optional): short label or descriptive name for the task.
-- `cwd` (string, optional): working directory (defaults to current directory).
-- `placement` (optional, `"tab"` \| `"split"`, default `"tab"`): where to run the process.
+### `onExit`
 
----
+| Value | When the job ends |
+| --- | --- |
+| `wake` (default) | Message to the agent; starts a new turn if it is idle |
+| `inform` | Message stored in the conversation, no new turn (good for services) |
+| `none` | No message; widget and events only |
 
-## User Commands & Shortcuts
+No duplicate message is sent when the agent already learned the outcome through `background_wait` or `background_stop`. A job stopped by the user from `/bg` is reported with `inform`.
 
-- `/backgrounds` (or `/bg`): opens the interactive management menu.
-- `Ctrl+Alt+B`: keyboard shortcut to open the management menu.
+## User
 
----
+- Widget above the editor: running jobs and jobs finished in the last 30 s.
+- Footer: number of active jobs.
+- `/bg` or `Ctrl+Alt+B`: pick a job, then view output, stop, or remove it.
+
+Jobs belong to the pi session: they are stopped when the session ends or reloads.
+
+## Other extensions
+
+Talk to ww-backgrounds through `pi.events`, no import needed:
+
+```ts
+let backgrounds: BackgroundsApi | undefined;
+pi.events.on("ww-backgrounds:api", (api) => (backgrounds = api as BackgroundsApi));
+pi.events.emit("ww-backgrounds:request-api", undefined);
+
+pi.events.on("ww-backgrounds:event", (event) => {
+  // { type: "start" | "status" | "output" | "exit", job, ... }
+});
+
+const job = await backgrounds?.start({ command: "npm run dev", onExit: "inform" });
+```
 
 ## Installation
 
-In Pi:
-
 ```bash
-pi install /Users/federico.alunni/code/personal/ww-backgrounds
+pi install /path/to/ww-backgrounds
 ```
 
-Or by adding it to `~/.pi/agent/settings.json`:
+or in `~/.pi/agent/settings.json`:
 
 ```json
-{
-  "packages": [
-    "/Users/federico.alunni/code/personal/ww-backgrounds"
-  ]
-}
+{ "packages": ["/path/to/ww-backgrounds"] }
 ```
 
----
+## Development
+
+```bash
+npm test
+```
+
+Requirements: macOS or Linux (the local backend uses POSIX process groups).
 
 ## License
 

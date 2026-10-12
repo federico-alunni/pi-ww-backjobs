@@ -1,28 +1,4 @@
-export type JobStatus = "running" | "completed" | "failed" | "stopped";
-
-export interface BackgroundJob {
-  id: string;
-  name: string;
-  command: string;
-  cwd: string;
-  paneId: string;
-  tabId: string;
-  tabLabel: string;
-  placement: "tab" | "split";
-  status: JobStatus;
-  exitCode?: number | null;
-  startedAt: number;
-  endedAt?: number;
-  statusFile: string;
-  scriptFile: string;
-}
-
-export interface BackgroundRunOptions {
-  command: string;
-  name?: string;
-  cwd?: string;
-  placement?: "tab" | "split";
-}
+/** Herdr CLI records, used by the (upcoming) Herdr backend. */
 
 export interface HerdrProcessInfo {
   pane_id: string;
