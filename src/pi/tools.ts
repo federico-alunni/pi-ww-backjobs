@@ -65,10 +65,13 @@ export function registerTools(pi: ExtensionAPI, state: AdapterState): void {
       "persistent work: dev servers, watchers, long builds or test suites, containers. " +
       "Output goes to a log file; the user sees the job in a widget. " +
       "By default (onExit: wake) you are notified when the job exits, so do not poll.",
-    promptSnippet: "Run long-running shell commands in the background without blocking",
+    promptSnippet: "Run commands that never exit or take minutes (servers, watchers, long builds) as background jobs",
     promptGuidelines: [
-      "Use background_run instead of bash for commands that run longer than a minute or never exit (dev servers, watchers).",
-      "After background_run, use background_wait with a pattern to wait for readiness (e.g. 'ready|listening'), not sleep loops.",
+      "Use background_run for commands that do not exit on their own (dev servers, watchers, `docker compose up`, `tail -f`), with onExit: 'inform'.",
+      "Use background_run for commands that may take minutes (full builds, full test suites, dependency installs, image builds); keep using bash for quick commands.",
+      "Never start background processes from bash: no trailing `&`, `nohup`, `disown`, `setsid` or `screen`/`tmux` sessions.",
+      "After background_run, wait with background_wait (use a pattern such as 'ready|listening' for servers) instead of sleep loops or repeated background_read calls.",
+      "With onExit: 'wake' (default) you are notified when the job ends: do not poll it, continue with other work or end your turn.",
     ],
     parameters: Type.Object({
       command: Type.String({ description: "Shell command (run with bash -c)" }),
