@@ -8,10 +8,10 @@ import { ExitNotifier } from "./pi/notifier.ts";
 import { registerTools, type AdapterState } from "./pi/tools.ts";
 import { WidgetController } from "./pi/widget.ts";
 
-export type { BackgroundsApi } from "./pi/bridge.ts";
+export type { BackjobsApi } from "./pi/bridge.ts";
 export { API_CHANNEL, EVENT_CHANNEL, REQUEST_API_CHANNEL } from "./pi/bridge.ts";
 
-export default function backgroundsExtension(pi: ExtensionAPI): void {
+export default function backjobsExtension(pi: ExtensionAPI): void {
   let current: ProcessManager | undefined;
   let unwire: (() => void) | undefined;
 

@@ -13,13 +13,13 @@ import type {
 import type { OnExit } from "./notifier.ts";
 
 /** Every core event, payload `JobEvent` ({ type, job, ... }). */
-export const EVENT_CHANNEL = "ww-backgrounds:event";
-/** Payload: `BackgroundsApi`. Emitted at load, at session start and on request. */
-export const API_CHANNEL = "ww-backgrounds:api";
+export const EVENT_CHANNEL = "pi-ww-backjobs:event";
+/** Payload: `BackjobsApi`. Emitted at load, at session start and on request. */
+export const API_CHANNEL = "pi-ww-backjobs:api";
 /** Emit (no payload) to receive the API on `API_CHANNEL`. */
-export const REQUEST_API_CHANNEL = "ww-backgrounds:request-api";
+export const REQUEST_API_CHANNEL = "pi-ww-backjobs:request-api";
 
-export interface BackgroundsApi {
+export interface BackjobsApi {
   readonly version: 1;
   /** `onExit` defaults to "wake", like the background_run tool. */
   start(options: StartOptions & { onExit?: OnExit }): Promise<JobInfo>;
@@ -37,7 +37,7 @@ export interface EventBusLike {
 }
 
 /** API bound lazily: always talks to the manager of the current session. */
-export function createApi(manager: () => ProcessManager): BackgroundsApi {
+export function createApi(manager: () => ProcessManager): BackjobsApi {
   return {
     version: 1,
     start: ({ onExit, ...options }) =>

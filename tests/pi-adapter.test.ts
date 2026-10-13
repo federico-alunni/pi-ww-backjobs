@@ -1,7 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import extension, { API_CHANNEL, EVENT_CHANNEL, REQUEST_API_CHANNEL, type BackgroundsApi } from "../src/index.ts";
+import extension, { API_CHANNEL, EVENT_CHANNEL, REQUEST_API_CHANNEL, type BackjobsApi } from "../src/index.ts";
 import type { JobInfo } from "../src/core/types.ts";
 import { renderWidgetLines, statusText, visibleJobs, LINGER_MS } from "../src/pi/widget.ts";
 
@@ -80,7 +80,7 @@ test("onExit default (wake): exit message with triggerTurn and output tail", asy
   assert.equal(h.messages.length, 1);
   const { message, options } = h.messages[0]!;
   assert.deepEqual(options, { triggerTurn: true, deliverAs: "followUp" });
-  assert.equal(message.customType, "ww-backgrounds:exit");
+  assert.equal(message.customType, "pi-ww-backjobs:exit");
   assert.match(message.content, /\[bg-1\] "build" failed \(exit 2\)/);
   assert.match(message.content, /built/);
 });
@@ -161,8 +161,8 @@ test("session_shutdown stops jobs without notifying", async () => {
 
 test("other extensions: API on request, events on the bus", async () => {
   const h = harness();
-  let api: BackgroundsApi | undefined;
-  h.pi.events.on(API_CHANNEL, (data: unknown) => (api = data as BackgroundsApi));
+  let api: BackjobsApi | undefined;
+  h.pi.events.on(API_CHANNEL, (data: unknown) => (api = data as BackjobsApi));
   const events: string[] = [];
   h.pi.events.on(EVENT_CHANNEL, (e: any) => events.push(`${e.type}:${e.job.status}`));
 

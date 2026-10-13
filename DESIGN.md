@@ -1,8 +1,8 @@
-# ww-backgrounds — Design
+# pi-ww-backjobs — Design
 
 ## Scope
 
-ww-backgrounds does **one thing**: manage background processes.
+pi-ww-backjobs does **one thing**: manage background processes.
 
 In scope:
 - start a process without blocking the caller
@@ -153,9 +153,9 @@ lines of output.
 - `/bg` and `Ctrl+Alt+B`: list, read output, stop, remove.
 
 ### Integration with other extensions (`pi.events`)
-- `ww-backgrounds:event` — every core event `{ type, job }`.
-- `ww-backgrounds:api` — the extension emits its public API object at load
-  and again whenever it receives `ww-backgrounds:request-api`, so load order
+- `pi-ww-backjobs:event` — every core event `{ type, job }`.
+- `pi-ww-backjobs:api` — the extension emits its public API object at load
+  and again whenever it receives `pi-ww-backjobs:request-api`, so load order
   does not matter.
 
 ## Open questions

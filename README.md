@@ -1,4 +1,4 @@
-# ww-backgrounds
+# pi-ww-backjobs
 
 [Pi coding agent](https://github.com/badlogic/pi-mono) extension that does one thing: **manage background processes**, for the agent and for the user.
 
@@ -38,30 +38,32 @@ Jobs belong to the pi session: they are stopped when the session ends or reloads
 
 ## Other extensions
 
-Talk to ww-backgrounds through `pi.events`, no import needed:
+Talk to pi-ww-backjobs through `pi.events`, no import needed:
 
 ```ts
-let backgrounds: BackgroundsApi | undefined;
-pi.events.on("ww-backgrounds:api", (api) => (backgrounds = api as BackgroundsApi));
-pi.events.emit("ww-backgrounds:request-api", undefined);
+let backjobs: BackjobsApi | undefined;
+pi.events.on("pi-ww-backjobs:api", (api) => (backjobs = api as BackjobsApi));
+pi.events.emit("pi-ww-backjobs:request-api", undefined);
 
-pi.events.on("ww-backgrounds:event", (event) => {
+pi.events.on("pi-ww-backjobs:event", (event) => {
   // { type: "start" | "status" | "output" | "exit", job, ... }
 });
 
-const job = await backgrounds?.start({ command: "npm run dev", onExit: "inform" });
+const job = await backjobs?.start({ command: "npm run dev", onExit: "inform" });
 ```
 
 ## Installation
 
 ```bash
-pi install /path/to/ww-backgrounds
+pi install git:github.com/federico-alunni/pi-ww-backjobs
+# or from a local checkout
+pi install /path/to/pi-ww-backjobs
 ```
 
 or in `~/.pi/agent/settings.json`:
 
 ```json
-{ "packages": ["/path/to/ww-backgrounds"] }
+{ "packages": ["git:github.com/federico-alunni/pi-ww-backjobs"] }
 ```
 
 ## Development

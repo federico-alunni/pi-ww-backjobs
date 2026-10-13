@@ -1,5 +1,5 @@
 {
-  "name": "ww-backgrounds",
+  "name": "pi-ww-backjobs",
   "version": "0.1.0",
   "description": "Background terminal operations manager and widget for Pi coding agent and Herdr",
   "type": "module",
@@ -31,5 +31,13 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/federico-alunni/pi-ww-backjobs.git"
+  },
+  "homepage": "https://github.com/federico-alunni/pi-ww-backjobs#readme",
+  "bugs": {
+    "url": "https://github.com/federico-alunni/pi-ww-backjobs/issues"
   }
 }

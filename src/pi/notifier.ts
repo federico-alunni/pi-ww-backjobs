@@ -4,7 +4,7 @@ import { formatExitMessage } from "./format.ts";
 export type OnExit = "wake" | "inform" | "none";
 export const ON_EXIT_VALUES: readonly OnExit[] = ["wake", "inform", "none"];
 export const DEFAULT_ON_EXIT: OnExit = "wake";
-export const EXIT_MESSAGE_TYPE = "ww-backgrounds:exit";
+export const EXIT_MESSAGE_TYPE = "pi-ww-backjobs:exit";
 const TAIL_LINES = 15;
 const TAIL_BYTES = 2000;
 

@@ -41,7 +41,7 @@ export function registerCommands(pi: ExtensionAPI, state: AdapterState): void {
         state.cursors.delete(job.id);
       }
     } catch (err: any) {
-      ctx.ui.notify(`ww-backgrounds: ${err?.message ?? err}`, "error");
+      ctx.ui.notify(`pi-ww-backjobs: ${err?.message ?? err}`, "error");
     }
   }
 

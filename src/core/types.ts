@@ -1,5 +1,5 @@
 /**
- * ww-backgrounds core contract.
+ * pi-ww-backjobs core contract.
  *
  * Pure types: no pi, no Herdr, no runtime code. See DESIGN.md.
  */

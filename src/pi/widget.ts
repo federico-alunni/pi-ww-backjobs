@@ -4,7 +4,7 @@ import { isTerminal } from "../core/process-manager.ts";
 import type { JobInfo } from "../core/types.ts";
 import { STATUS_STYLE, describeStatus, jobDuration } from "./format.ts";
 
-export const WIDGET_KEY = "ww-backgrounds";
+export const WIDGET_KEY = "pi-ww-backjobs";
 /** Finished jobs stay visible for this long. */
 export const LINGER_MS = 30_000;
 const MAX_ROWS = 6;

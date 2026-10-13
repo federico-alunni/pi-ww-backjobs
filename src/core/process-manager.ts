@@ -119,7 +119,7 @@ export class ProcessManager implements ProcessManagerApi {
       try {
         listener(event);
       } catch (err) {
-        console.error(`ww-backgrounds: ${type} listener failed:`, err);
+        console.error(`pi-ww-backjobs: ${type} listener failed:`, err);
       }
     }
   }
@@ -353,7 +353,7 @@ export class ProcessManager implements ProcessManagerApi {
   }
 
   private ensureLogDir(): string {
-    if (!this.logDir) this.logDir = mkdtempSync(join(tmpdir(), "ww-backgrounds-"));
+    if (!this.logDir) this.logDir = mkdtempSync(join(tmpdir(), "pi-ww-backjobs-"));
     return this.logDir;
   }
 
@@ -361,7 +361,7 @@ export class ProcessManager implements ProcessManagerApi {
     const previous = record.info.status;
     if (previous === next) return false;
     if (!STATUS_TRANSITIONS[previous].includes(next)) {
-      console.error(`ww-backgrounds: invalid transition ${previous} → ${next} for ${record.info.id}`);
+      console.error(`pi-ww-backjobs: invalid transition ${previous} → ${next} for ${record.info.id}`);
       return false;
     }
     record.info.status = next;
