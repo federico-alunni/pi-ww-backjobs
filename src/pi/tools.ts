@@ -2,7 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
 import { isTerminal, type ProcessManager } from "../core/process-manager.ts";
-import type { JobInfo, ReadResult } from "../core/types.ts";
+import type { JobInfo, JobLifetime, ReadResult } from "../core/types.ts";
 import { describeStatus, formatJobLine, jobDuration } from "./format.ts";
 import { DEFAULT_ON_EXIT, ON_EXIT_VALUES, type ExitNotifier, type OnExit } from "./notifier.ts";
 
@@ -15,7 +15,12 @@ export interface AdapterState {
   notifier: ExitNotifier;
   /** Byte offset of the model's last read, per job. */
   cursors: Map<string, number>;
+  /** Durable registry of the current session, if any. */
+  durableDir(): string | undefined;
+  refreshWidget(): void;
 }
+
+const LIFETIME_VALUES: readonly JobLifetime[] = ["session", "durable"];
 
 /** String enum as a plain JSON-schema enum (works with every provider). */
 function stringEnum<T extends string>(values: readonly T[], description: string): TSchema {
@@ -64,7 +69,8 @@ export function registerTools(pi: ExtensionAPI, state: AdapterState): void {
       "Start a shell command as a background job and return immediately. Use it for long-running or " +
       "persistent work: dev servers, watchers, long builds or test suites, containers. " +
       "Output goes to a log file; the user sees the job in a widget. " +
-      "By default (onExit: wake) you are notified when the job exits, so do not poll.",
+      "By default (onExit: wake) you are notified when the job exits, so do not poll. " +
+      "With lifetime: 'durable' the job survives /reload and pi exiting, and is found again when this session resumes.",
     promptSnippet: "Run commands that never exit or take minutes (servers, watchers, long builds) as background jobs",
     promptGuidelines: [
       "Use background_run for commands that do not exit on their own (dev servers, watchers, `docker compose up`, `tail -f`), with onExit: 'inform'.",
@@ -72,6 +78,7 @@ export function registerTools(pi: ExtensionAPI, state: AdapterState): void {
       "Never start background processes from bash: no trailing `&`, `nohup`, `disown`, `setsid` or `screen`/`tmux` sessions.",
       "After background_run, wait with background_wait (use a pattern such as 'ready|listening' for servers) instead of sleep loops or repeated background_read calls.",
       "With onExit: 'wake' (default) you are notified when the job ends: do not poll it, continue with other work or end your turn.",
+      "Use lifetime: 'durable' for jobs that must not be interrupted by a /reload or restart; a durable job reported 'lost' may or may not have completed: verify its effect before running it again, never re-run it blindly.",
     ],
     parameters: Type.Object({
       command: Type.String({ description: "Shell command (run with bash -c)" }),
@@ -85,14 +92,27 @@ export function registerTools(pi: ExtensionAPI, state: AdapterState): void {
             "Use 'inform' for services expected to run until stopped.",
         ),
       ),
+      lifetime: Type.Optional(
+        stringEnum(
+          LIFETIME_VALUES,
+          "'session' (default): stopped when the session ends or reloads. " +
+            "'durable': keeps running after /reload or pi exiting; when this session resumes it is reattached " +
+            "(running, or finished with its real exit code) and never restarted.",
+        ),
+      ),
     }),
     async execute(_callId, params, _signal, _onUpdate, ctx) {
       const onExit = (params.onExit as OnExit | undefined) ?? DEFAULT_ON_EXIT;
       const cwd = params.cwd ? (isAbsolute(params.cwd) ? params.cwd : resolve(ctx.cwd, params.cwd)) : ctx.cwd;
+      const lifetime = (params.lifetime as JobLifetime | undefined) ?? "session";
+      if (lifetime === "durable" && !state.durableDir()) {
+        throw new Error("Durable jobs are not available: no pi session id (lifetime: 'session' still works).");
+      }
       const job = await state.manager().start({
         command: params.command,
         name: params.name,
         cwd,
+        lifetime,
         metadata: { onExit },
       });
       if (job.status === "failed") {
@@ -101,8 +121,9 @@ export function registerTools(pi: ExtensionAPI, state: AdapterState): void {
       }
       return {
         content: text(
-          `Started background job [${job.id}] "${job.name}" (pid ${job.pid}) in ${job.cwd}.\n` +
-            `Log: ${job.logFile}\n${onExitHint(onExit)}`,
+          `Started ${lifetime === "durable" ? "durable " : ""}background job [${job.id}] "${job.name}" (pid ${job.pid}) in ${job.cwd}.\n` +
+            `Log: ${job.logFile}\n${onExitHint(onExit)}` +
+            (lifetime === "durable" ? "\nIt keeps running after /reload or pi exiting and is reattached when this session resumes." : ""),
         ),
         details: { job },
       };

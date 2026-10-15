@@ -36,8 +36,9 @@ export function describeStatus(job: JobInfo): string {
 /** One-line, plain-text summary for the model. */
 export function formatJobLine(job: JobInfo, now = Date.now()): string {
   const pid = job.pid ? ` pid ${job.pid}` : "";
+  const durable = job.lifetime === "durable" ? " durable" : "";
   const error = job.error ? ` error: ${job.error}` : "";
-  return `[${job.id}] "${job.name}" — ${describeStatus(job)}, ${jobDuration(job, now)}${pid}${error}\n    $ ${job.command}\n    cwd: ${job.cwd}`;
+  return `[${job.id}] "${job.name}" — ${describeStatus(job)}, ${jobDuration(job, now)}${durable}${pid}${error}\n    $ ${job.command}\n    cwd: ${job.cwd}`;
 }
 
 export function lastLines(text: string, count: number): string {
@@ -47,9 +48,13 @@ export function lastLines(text: string, count: number): string {
 
 /** Text of the message sent to the model when a job ends. */
 export function formatExitMessage(job: JobInfo, tail: string): string {
-  const header = `Background job [${job.id}] "${job.name}" ${describeStatus(job)} after ${jobDuration(job)}.`;
+  const kind = job.lifetime === "durable" ? "Durable background job" : "Background job";
+  const header = `${kind} [${job.id}] "${job.name}" ${describeStatus(job)} after ${jobDuration(job)}.`;
   const parts = [header, `$ ${job.command}`];
   if (job.error) parts.push(`Error: ${job.error}`);
+  if (job.status === "lost" && job.lifetime === "durable") {
+    parts.push("Outcome unknown: it was not restarted. Check whether its effect happened before running it again.");
+  }
   parts.push(tail.trim() ? `Last output:\n${tail}` : "No output.");
   parts.push(`Full log: ${job.logFile}`);
   return parts.join("\n");

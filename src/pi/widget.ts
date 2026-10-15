@@ -42,7 +42,8 @@ export function renderWidgetLines(jobs: JobInfo[], theme: ThemeLike, availableWi
     const style = STATUS_STYLE[job.status];
     const left = `${theme.fg(style.color, style.icon)} ${theme.bold(job.id)} ${job.name}`;
     const status = isTerminal(job.status) ? `${describeStatus(job)} · ` : "";
-    const right = theme.fg("dim", `${status}${jobDuration(job, now)}`);
+    const durable = job.lifetime === "durable" ? "durable · " : "";
+    const right = theme.fg("dim", `${status}${durable}${jobDuration(job, now)}`);
     lines.push(row(left, right, width, theme));
   }
   if (visible.length > MAX_ROWS) {

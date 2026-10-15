@@ -1,5 +1,8 @@
-import { afterEach, test } from "node:test";
+import { after, afterEach, test } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import extension, { API_CHANNEL, EVENT_CHANNEL, REQUEST_API_CHANNEL, type BackjobsApi } from "../src/index.ts";
 import type { JobInfo } from "../src/core/types.ts";
@@ -7,7 +10,11 @@ import { renderWidgetLines, statusText, visibleJobs, LINGER_MS } from "../src/pi
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function createHarness() {
+const STATE_ROOT = mkdtempSync(join(tmpdir(), "backjobs-adapter-"));
+process.env.PI_WW_BACKJOBS_STATE_DIR = STATE_ROOT;
+after(() => rmSync(STATE_ROOT, { recursive: true, force: true }));
+
+function createHarness(options: { sessionId?: string } = {}) {
   const tools = new Map<string, any>();
   const commands = new Map<string, any>();
   const handlers = new Map<string, Function>();
@@ -33,6 +40,7 @@ function createHarness() {
 
   extension(pi);
   const ctx: any = { cwd: process.cwd(), hasUI: false, mode: "print" };
+  if (options.sessionId) ctx.sessionManager = { getSessionId: () => options.sessionId };
   handlers.get("session_start")!({ type: "session_start" }, ctx);
 
   async function call(name: string, params: Record<string, unknown>) {
@@ -51,8 +59,8 @@ function createHarness() {
 }
 
 let current: ReturnType<typeof createHarness> | undefined;
-function harness() {
-  current = createHarness();
+function harness(options?: { sessionId?: string }) {
+  current = createHarness(options);
   return current;
 }
 afterEach(async () => {
@@ -183,6 +191,104 @@ test("other extensions: API on request, events on the bus", async () => {
   assert.equal(h.messages.length, 0);
 });
 
+// ── Durable jobs ─────────────────────────────────────────────────────────────
+
+test("durable job: survives shutdown, reattached on session_start, notified once", async () => {
+  const sessionId = "session-durable-1";
+  const first = harness({ sessionId });
+  const run = await first.call("background_run", { command: "sleep 0.5; echo shipped; exit 0", name: "ship", lifetime: "durable" });
+  assert.match(run.text, /Started durable background job \[bg-1\] "ship"/);
+  assert.equal(run.details.job.logFile, join(STATE_ROOT, sessionId, "bg-1.log"));
+  await first.shutdown();
+  current = undefined;
+  assert.equal(first.messages.length, 0);
+
+  // Still running after the session ended.
+  const second = harness({ sessionId });
+  await sleep(100);
+  const listed = await second.call("background_list", {});
+  assert.match(listed.text, /\[bg-1\] "ship" — running, \d+s durable/);
+  const wait = await second.call("background_wait", { id: "bg-1", timeoutSeconds: 5 });
+  assert.match(wait.text, /succeeded \(exit 0\)/);
+  assert.match(wait.text, /shipped/);
+  await sleep(200);
+  assert.equal(second.messages.length, 0, "wait already reported the exit");
+  await second.shutdown();
+  current = undefined;
+
+  // Already reported: no message on the next resume.
+  const third = harness({ sessionId });
+  await sleep(200);
+  assert.equal(third.messages.length, 0);
+  assert.match((await third.call("background_list", {})).text, /succeeded \(exit 0\)/);
+});
+
+test("durable job that ended while pi was closed: one message on resume, per onExit", async () => {
+  const sessionId = "session-durable-2";
+  const first = harness({ sessionId });
+  await first.call("background_run", { command: "echo pushed; exit 3", name: "push", lifetime: "durable", onExit: "wake" });
+  await first.shutdown(); // may race the exit: either way the next resume reports it once
+  current = undefined;
+  await sleep(300);
+
+  const second = harness({ sessionId });
+  await sleep(300);
+  const total = first.messages.length + second.messages.length;
+  assert.equal(total, 1);
+  const { message, options } = (second.messages[0] ?? first.messages[0])!;
+  assert.deepEqual(options, { triggerTurn: true, deliverAs: "followUp" });
+  assert.match(message.content, /Durable background job \[bg-1\] "push" failed \(exit 3\)/);
+  assert.match(message.content, /pushed/);
+  await second.shutdown();
+  current = undefined;
+
+  const third = harness({ sessionId });
+  await sleep(300);
+  assert.equal(third.messages.length, 0);
+});
+
+test("durable job lost while pi was closed: reported, not restarted, with a warning", async () => {
+  const sessionId = "session-durable-3";
+  const first = harness({ sessionId });
+  const run = await first.call("background_run", { command: "sleep 30", name: "deploy", lifetime: "durable", onExit: "inform" });
+  await first.shutdown();
+  current = undefined;
+  // Wrapper first: killing the group at once may let it record the exit (137).
+  process.kill(run.details.job.pid, "SIGKILL");
+  process.kill(-run.details.job.pid, "SIGKILL");
+  await sleep(200);
+
+  const second = harness({ sessionId });
+  await sleep(300);
+  assert.equal(second.messages.length, 1);
+  assert.deepEqual(second.messages[0]!.options, { triggerTurn: false });
+  assert.match(second.messages[0]!.message.content, /"deploy" lost/);
+  assert.match(second.messages[0]!.message.content, /not restarted/);
+});
+
+test("durable needs a session id; other sessions do not see the jobs; /bg clean", async () => {
+  const anonymous = harness();
+  await assert.rejects(anonymous.call("background_run", { command: "true", lifetime: "durable" }), /not available/);
+  await anonymous.shutdown();
+
+  const owner = harness({ sessionId: "session-durable-4" });
+  const run = await owner.call("background_run", { command: "true", lifetime: "durable", onExit: "none" });
+  await owner.call("background_wait", { id: run.details.job.id, timeoutSeconds: 5 });
+  await owner.shutdown();
+
+  const other = harness({ sessionId: "session-durable-5" });
+  await sleep(100);
+  assert.match((await other.call("background_list", {})).text, /No background jobs/);
+  await other.shutdown();
+
+  const back = harness({ sessionId: "session-durable-4" });
+  await sleep(100);
+  assert.match((await back.call("background_list", {})).text, /\[bg-1\]/);
+  await back.commands.get("bg").handler("clean", { hasUI: false });
+  assert.match((await back.call("background_list", {})).text, /No background jobs/);
+  assert.ok(!existsSync(join(STATE_ROOT, "session-durable-4", "bg-1.json")));
+});
+
 // ── Widget ───────────────────────────────────────────────────────────────────
 
 const plainTheme: any = { fg: (_c: string, t: string) => t, bold: (t: string) => t };
@@ -194,6 +300,7 @@ function fakeJob(overrides: Partial<JobInfo>): JobInfo {
     command: "npm run dev",
     cwd: "/tmp",
     backend: "local",
+    lifetime: "session",
     status: "running",
     startedAt: 1_000_000,
     logFile: "/tmp/bg-1.log",
